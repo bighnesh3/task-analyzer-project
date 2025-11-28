@@ -1,0 +1,103 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+{% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Task Analyzer</title>
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Smart Task Analyzer</h1>
+            <p class="subtitle">Intelligently prioritize your tasks based on urgency, importance, effort, and dependencies</p>
+        </header>
+
+        <main>
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="section-header">
+                    <h2>Task Input</h2>
+                    <div class="strategy-selector">
+                        <label for="strategy">Scoring Strategy:</label>
+                        <select id="strategy" class="strategy-dropdown">
+                            <option value="smart">Smart Balance</option>
+                            <option value="fast">Fastest Wins</option>
+                            <option value="impact">High Impact</option>
+                            <option value="deadline">Deadline Driven</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="strategy-info">
+                    <p id="strategy-description">
+                        <strong>Smart Balance:</strong> Balances urgency, importance, effort, and dependencies equally
+                    </p>
+                </div>
+
+                <div class="task-input-container">
+                    <div class="task-list" id="taskList">
+                        <!-- Task rows will be added here dynamically -->
+                    </div>
+                    
+                    <button class="btn btn-secondary" id="addTaskBtn">
+                        <span>+</span> Add Task
+                    </button>
+                </div>
+
+                <div class="bulk-input-section">
+                    <h3>Or Paste JSON Tasks</h3>
+                    <textarea 
+                        id="bulkTaskInput" 
+                        placeholder='[{"id":"task1","title":"Fix bug","due_date":"2025-12-01","estimated_hours":3,"importance":8,"dependencies":[]}]'
+                        rows="4"
+                    ></textarea>
+                    <button class="btn btn-secondary" id="loadBulkBtn">Load JSON Tasks</button>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="analyzeBtn">
+                        <span class="btn-icon">📊</span> Analyze All Tasks
+                    </button>
+                    <button class="btn btn-accent" id="suggestBtn">
+                        <span class="btn-icon">⭐</span> Suggest Top 3 Tasks
+                    </button>
+                    <button class="btn btn-tertiary" id="clearBtn">
+                        <span class="btn-icon">🗑️</span> Clear All
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Indicator -->
+            <div class="loading-container" id="loadingIndicator" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing tasks...</p>
+            </div>
+
+            <!-- Output Section -->
+            <section class="output-section" id="outputSection" style="display: none;">
+                <h2>Analysis Results</h2>
+                
+                <!-- Warnings -->
+                <div class="warnings-container" id="warningsContainer" style="display: none;">
+                    <h3>⚠️ Warnings</h3>
+                    <ul id="warningsList"></ul>
+                </div>
+
+                <!-- Results Grid -->
+                <div class="results-grid" id="resultsGrid">
+                    <!-- Results will be populated here -->
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Singularium Internship 2025 - Task Prioritization Engine</p>
+        </footer>
+    </div>
+
+    <script src="{% static 'script.js' %}"></script>
+</body>
+</html>

@@ -83,63 +83,75 @@ def score_tasks(
     }
 
 
-def _validate_task(
-    task: Dict[str, Any], 
-    idx: int, 
-    today: date
-) -> Tuple[Dict[str, Any], List[str]]:
-    """Validate and normalize a single task."""
+def _validate_task(task, idx, today):
     warnings = []
     validated = {
         'id': task.get('id', f'task_{idx}'),
         'title': task.get('title', f'Untitled Task {idx}'),
         'past_due': False,
-        'dependency_issue': False
+        'dependency_issue': False,
+        'validation_warnings': [],
+        'incomplete': False
     }
-    
-    # Validate due_date
+
+    # --- due_date (frontend guarantees valid) ---
     due_date_str = task.get('due_date')
-    if due_date_str:
-        try:
-            validated['due_date'] = datetime.fromisoformat(due_date_str.replace('Z', '+00:00')).date()
-            validated['past_due'] = validated['due_date'] < today
-        except (ValueError, AttributeError):
-            warnings.append(f"Task '{validated['title']}': Invalid due_date format. Using fallback.")
-            validated['due_date'] = today
-    else:
-        warnings.append(f"Task '{validated['title']}': Missing due_date. Using today's date.")
+    try:
+        validated['due_date'] = datetime.fromisoformat(
+            due_date_str.replace("Z", "+00:00")
+        ).date()
+        validated['past_due'] = validated['due_date'] < today
+    except Exception:
+        # Should not happen. Frontend validates, but be safe.
+        msg = f"Task '{validated['title']}': Invalid or missing due date."
+        warnings.append(msg)
+        validated['validation_warnings'].append(msg)
         validated['due_date'] = today
-    
-    # Validate estimated_hours
-    try:
-        estimated_hours = float(task.get('estimated_hours', 1))
-        validated['estimated_hours'] = max(0.1, min(estimated_hours, 1000))
-        if estimated_hours <= 0:
-            warnings.append(f"Task '{validated['title']}': Invalid estimated_hours. Using 1.")
-            validated['estimated_hours'] = 1
-    except (ValueError, TypeError):
-        warnings.append(f"Task '{validated['title']}': Invalid estimated_hours. Using 1.")
+        validated['incomplete'] = True
+
+    # --- estimated_hours (soft field) ---
+    if task.get('estimated_hours') is None:
         validated['estimated_hours'] = 1
-    
-    # Validate importance
-    try:
-        importance = float(task.get('importance', 5))
-        validated['importance'] = max(1, min(importance, 10))
-        if importance < 1 or importance > 10:
-            warnings.append(f"Task '{validated['title']}': Importance out of range. Clamped to 1-10.")
-    except (ValueError, TypeError):
-        warnings.append(f"Task '{validated['title']}': Invalid importance. Using 5.")
-        validated['importance'] = 5
-    
-    # Validate dependencies
-    dependencies = task.get('dependencies', [])
-    if isinstance(dependencies, list):
-        validated['dependencies'] = [str(dep) for dep in dependencies]
+        msg = f"Task '{validated['title']}': Missing estimated_hours. Using default 1."
+        warnings.append(msg)
+        validated['validation_warnings'].append(msg)
+        validated['incomplete'] = True
     else:
-        warnings.append(f"Task '{validated['title']}': Invalid dependencies format. Using empty list.")
+        validated['estimated_hours'] = float(task.get('estimated_hours'))
+
+    # --- importance (soft field) ---
+    if task.get('importance') is None:
+        validated['importance'] = 5
+        msg = f"Task '{validated['title']}': Missing importance. Using default 5."
+        warnings.append(msg)
+        validated['validation_warnings'].append(msg)
+        validated['incomplete'] = True
+    else:
+        validated['importance'] = float(task.get('importance'))
+
+    # --- dependencies ---
+    deps = task.get('dependencies', [])
+    if isinstance(deps, list):
+        validated['dependencies'] = [str(d) for d in deps]
+    else:
         validated['dependencies'] = []
-    
+        msg = f"Task '{validated['title']}': Invalid dependencies format. Using empty list."
+        warnings.append(msg)
+        validated['validation_warnings'].append(msg)
+        validated['incomplete'] = True
+
+    # CONFIDENCE = 1.0 - missing_count * 0.25
+    missing_count = 0
+    if task.get('estimated_hours') is None:
+        missing_count += 1
+    if task.get('importance') is None:
+        missing_count += 1
+
+    validated['confidence'] = round(max(0.0, 1.0 - 0.25 * missing_count), 2)
+
+    validated["validation_warnings"] = warnings.copy()
     return validated, warnings
+
 
 
 def _detect_circular_dependencies(tasks: List[Dict[str, Any]]) -> Set[str]:
@@ -253,8 +265,14 @@ def _calculate_task_score(
     days_until_due = (task['due_date'] - today).days
     
     if task['past_due']:
-        urgency_score = 1.0
-        urgency_desc = "overdue"
+        # recently overdue gets high urgency, old overdue decays
+        days_overdue = (today - task['due_date']).days
+        max_floor = 0.20
+        decay_days = 14.0
+        urgency_score = max_floor + (1.0 - max_floor) * math.exp(-days_overdue / decay_days)
+        urgency_score = round(min(1.0, max(0.0, urgency_score)), 4)
+        urgency_desc = f"overdue by {days_overdue}d"
+
     elif days_until_due <= 0:
         urgency_score = 0.98
         urgency_desc = "due today"
@@ -352,6 +370,9 @@ def _calculate_task_score(
     else:
         explanation = f"Priority driven by: {', '.join(explanation_parts)}" if explanation_parts else "Standard priority task"
     
+    if task.get('incomplete'):
+        explanation += " (NOTE: used default values where fields were missing)"
+
     return total_score, explanation
 
 

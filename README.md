@@ -51,7 +51,7 @@ pip install -r requirements.txt
 ### **Run Server**
 
 ```bash
-python manage.py runserver
+python backend/manage.py runserver
 ```
 
 Once the server starts, open the root URL shown in the terminal. The full browser‑based interface is provided at the main route—this offers the best experience for testing, experimentation, and visualizing how the scoring engine behaves with different kinds of input.
